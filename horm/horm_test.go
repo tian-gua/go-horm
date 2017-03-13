@@ -22,6 +22,10 @@ func TestHorm(t *testing.T) {
 	rows, err := horm.DelById(th)
 	dealError(err)
 	t.Logf("rows=%d", rows)
+	th2 := &testHorm{Id: 9}
+	err = horm.FindById(th2)
+	dealError(err)
+	t.Logf("%+v", th2)
 	err = horm.Commit()
 	dealError(err)
 	err = hormManager.CloseAll()
@@ -38,7 +42,7 @@ type testHorm struct {
 	Id          int       `field:"id" default:"auto"`
 	CreateTime  time.Time `field:"create_time"`
 	ModifyTime  time.Time `field:"modify_time"`
-	State       int       `field:"state"`
+	State       int64     `field:"state"`
 	Type        int       `field:"type"`
 	Description string    `field:"description"`
 }

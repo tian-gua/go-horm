@@ -33,17 +33,29 @@ func (d *defaultHorm) List(list []interface{}, conditions ...string) error {
 }
 
 func (d *defaultHorm) FindById(i interface{}) error {
-	_, err := sqlGenerator.GenerateFindByIdSql(i)
+	sqlStr, err := sqlGenerator.GenerateFindByIdSql(i)
 	if err != nil {
-		return nil, fmt.Errorf("generate sql error:%s", err.Error())
+		return fmt.Errorf("generate sql error:%s", err.Error())
 	}
-	return errors.New("Not yet supported")
+	rows, err := d.query(sqlStr)
+	if err != nil {
+		return fmt.Errorf("Query select sql error:%s", err)
+	}
+	err = d.inject(i, rows, 1)
+	if err != nil {
+		return fmt.Errorf("Data inject error:%s", err)
+	}
+	err = rows.Close()
+	if err != nil {
+		return fmt.Errorf("Close rows failed")
+	}
+	return nil
 }
 
 func (d *defaultHorm) Save(i interface{}) (sql.Result, error) {
 	sqlStr, err := sqlGenerator.GenerateSaveSql(i)
 	if err != nil {
-		return nil, fmt.Errorf("generate sql error:%s", err.Error())
+		return nil, fmt.Errorf("generate sql failed:%s", err.Error())
 	}
 	return d.exec(sqlStr)
 }
@@ -81,7 +93,7 @@ func (d *defaultHorm) Begin() error {
 	var err error
 	tx, err := d.db.Begin()
 	if err != nil {
-		return errors.New("Begin transaction failed:" + err.Error())
+		return errors.New("Begin transaction err:" + err.Error())
 	}
 	d.txMap[getGID()] = tx
 	return nil
@@ -135,4 +147,38 @@ func (d *defaultHorm) query(sqlStr string) (*sql.Rows, error) {
 		return nil, fmt.Errorf("execute sql error:%s", err.Error())
 	}
 	return rows, nil
+}
+
+func (d *defaultHorm) inject(i interface{}, rows *sql.Rows, count int) error {
+	columns, err := rows.Columns()
+	if err != nil {
+		fmt.Errorf("Get columns error:%s", err.Error())
+	}
+	values := make([]sql.RawBytes, len(columns))
+	scans := make([]interface{}, len(columns))
+	for index, _ := range values {
+		scans[index] = &values[index]
+	}
+	sv, err := getStructValue(i)
+	if err != nil {
+		return fmt.Errorf("Get struct value failed:%s", err.Error())
+	}
+	rowNum := 0
+	for rows.Next() {
+		rowNum++
+		if rowNum > count {
+			return fmt.Errorf("Select one but found more")
+		}
+		err = rows.Scan(scans...)
+		if err != nil {
+			return err
+		}
+		for k, v := range values {
+			err := setValue(sv.fieldValueMap[columns[k]], v)
+			if err != nil {
+				return fmt.Errorf("Set value failed:%s", err)
+			}
+		}
+	}
+	return nil
 }
