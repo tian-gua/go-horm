@@ -15,6 +15,7 @@ type IHorm interface {
 	UpdateById(i interface{}) (int64, error)             //根据id更新
 	DelById(i interface{}) (int64, error)                //根据id删除
 	Query(string) (int, error)                           //自定义sql
+	Exec(string) (sql.Result, error)                     //自定义sql
 	Begin() error                                        //开始事务
 	Commit() error                                       //提交事务
 	RollBack() error                                     //回滚
@@ -86,6 +87,10 @@ func (d *defaultHorm) DelById(i interface{}) (int64, error) {
 
 func (d *defaultHorm) Query(s string) (int, error) {
 	return 0, errors.New("Not yet supported")
+}
+
+func (d *defaultHorm) Exec(string) (sql.Result, error) {
+	return nil, errors.New("Not yet supported")
 }
 
 func (d *defaultHorm) Begin() error {
