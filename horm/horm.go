@@ -9,18 +9,16 @@ import (
 )
 
 type IHorm interface {
-	List(list []interface{}, conditions ...string) error     //查询列表
-	FindById(i interface{}) error                            //根据id查找
-	Save(i interface{}) (sql.Result, error)                  //插入单个记录
-	Update(i interface{}, conditions ...string) (int, error) //根据条件更新
-	UpdateById(i interface{}) (int64, error)                   //根据id更新
-	DelById(i interface{}) (int64, error)                      //根据id删除
-	Del(i interface{}, conditions ...string) (int, error)    //根据条件删除
-	Query(string) (int, error)                               //自定义sql
-	Begin() error                                            //开始事务
-	Commit() error                                           //提交事务
-	RollBack() error                                         //回滚
-	RegistMapping(i interface{}) error                       //注册映射(目前为自动注册)
+	List(list []interface{}, conditions ...string) error //查询列表
+	FindById(i interface{}) error                        //根据id查找
+	Save(i interface{}) (sql.Result, error)              //插入单个记录
+	UpdateById(i interface{}) (int64, error)             //根据id更新
+	DelById(i interface{}) (int64, error)                //根据id删除
+	Query(string) (int, error)                           //自定义sql
+	Begin() error                                        //开始事务
+	Commit() error                                       //提交事务
+	RollBack() error                                     //回滚
+	RegistMapping(i interface{}) error                   //注册映射(目前为自动注册)
 }
 
 type defaultHorm struct {
@@ -35,6 +33,10 @@ func (d *defaultHorm) List(list []interface{}, conditions ...string) error {
 }
 
 func (d *defaultHorm) FindById(i interface{}) error {
+	_, err := sqlGenerator.GenerateFindByIdSql(i)
+	if err != nil {
+		return nil, fmt.Errorf("generate sql error:%s", err.Error())
+	}
 	return errors.New("Not yet supported")
 }
 
@@ -44,10 +46,6 @@ func (d *defaultHorm) Save(i interface{}) (sql.Result, error) {
 		return nil, fmt.Errorf("generate sql error:%s", err.Error())
 	}
 	return d.exec(sqlStr)
-}
-
-func (d *defaultHorm) Update(i interface{}, conditions ...string) (int, error) {
-	return 0, errors.New("Not yet supported")
 }
 
 func (d *defaultHorm) UpdateById(i interface{}) (int64, error) {
@@ -72,10 +70,6 @@ func (d *defaultHorm) DelById(i interface{}) (int64, error) {
 		return 0, errors.New("Execute delete operate failed:" + err.Error())
 	}
 	return res.RowsAffected()
-}
-
-func (d *defaultHorm) Del(i interface{}, conditions ...string) (int, error) {
-	return 0, errors.New("Not yet supported")
 }
 
 func (d *defaultHorm) Query(s string) (int, error) {
@@ -115,7 +109,7 @@ func (d *defaultHorm) getStatement(s string) (*sql.Stmt, error) {
 	return d.txMap[getGID()].Prepare(s)
 }
 
-func (d *defaultHorm)exec(sqlStr string) (sql.Result, error) {
+func (d *defaultHorm) exec(sqlStr string) (sql.Result, error) {
 	stmt, err := d.getStatement(sqlStr)
 	if err != nil {
 		return nil, fmt.Errorf("get statement error:%s", err.Error())
@@ -124,5 +118,21 @@ func (d *defaultHorm)exec(sqlStr string) (sql.Result, error) {
 	if err != nil {
 		return nil, fmt.Errorf("execute sql error:%s", err.Error())
 	}
+	err = stmt.Close()
+	if err != nil {
+		return nil, fmt.Errorf("Close statement error:%s", err.Error())
+	}
 	return result, nil
+}
+
+func (d *defaultHorm) query(sqlStr string) (*sql.Rows, error) {
+	stmt, err := d.getStatement(sqlStr)
+	if err != nil {
+		return nil, fmt.Errorf("get statement error:%s", err.Error())
+	}
+	rows, err := stmt.Query()
+	if err != nil {
+		return nil, fmt.Errorf("execute sql error:%s", err.Error())
+	}
+	return rows, nil
 }
