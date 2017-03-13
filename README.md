@@ -43,21 +43,24 @@ func newTestHorm() *testHorm {
 
 ```
 //创建一个HormManager
-hormManager := New() 
+hormManager := New()   
+ 
 //连接数据库
 //did为这一次连接的标识符,生成规则会当前时间戳(纳秒单位)
-did, err := hormManager.Connect("127.0.0.1", 3306, "root", "root", "horm")
-
+did, err := hormManager.Connect("127.0.0.1", 3306, "root", "root", "horm")   
+   
 //在当前did对应的连接中创建一个horm操作对象
-horm := hormManager.Create(did)
-
+horm := hormManager.Create(did)   
+   
 //开启一个事务
 err = horm.Begin()
+   
 //保存新建的struct到数据库
 //res为操作的结果,可以获取最新添加的id和操作的记录的条数
 res, err := horm.Save(newTestHorm())
 //提交事务
-err = horm.Commit()
+err = horm.Commit()    
+   
 //关闭所有goroutine的连接
 err = hormManager.CloseAll()
 ```
@@ -68,6 +71,4 @@ err = hormManager.CloseAll()
 [horm]εε[2017-03-13 11:31:15]:	Horm-Connection[1489375875531622312] is closed.
 ```
 
-
-
-
+![horm使用步骤.png](https://github.com/aidonggua/go-horm/blob/master/horm%E4%BD%BF%E7%94%A8%E6%AD%A5%E9%AA%A4.png)
