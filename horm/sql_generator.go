@@ -134,7 +134,7 @@ func (d *defaultSqlGenerator) GenerateDelByIdSql(i interface{}) (string, error) 
 	if structValue.pkName == "" || structValue.pkValue == "" {
 		return "", fmt.Errorf("id can not be empty")
 	}
-	s := fmt.Sprintf("DELETE FORM %s WHERE %s = %s", structValue.tableName, structValue.pkName, structValue.pkValue)
+	s := fmt.Sprintf("DELETE FROM %s WHERE %s = %s", structValue.tableName, structValue.pkName, structValue.pkValue)
 	color.Green("[horm]εε[%s]:\t%s", time.Now().Format("2006-01-02 15:04:05"), s)
 	return s, nil
 }

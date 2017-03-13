@@ -13,8 +13,8 @@ type IHorm interface {
 	FindById(i interface{}) error                            //根据id查找
 	Save(i interface{}) (sql.Result, error)                  //插入单个记录
 	Update(i interface{}, conditions ...string) (int, error) //根据条件更新
-	UpdateById(i interface{}) (int, error)                   //根据id更新
-	DelById(i interface{}) (int, error)                      //根据id删除
+	UpdateById(i interface{}) (int64, error)                   //根据id更新
+	DelById(i interface{}) (int64, error)                      //根据id删除
 	Del(i interface{}, conditions ...string) (int, error)    //根据条件删除
 	Query(string) (int, error)                               //自定义sql
 	Begin() error                                            //开始事务
@@ -43,31 +43,35 @@ func (d *defaultHorm) Save(i interface{}) (sql.Result, error) {
 	if err != nil {
 		return nil, fmt.Errorf("generate sql error:%s", err.Error())
 	}
-	stmt, err := d.getStatement(sqlStr)
-	if err != nil {
-		return nil, fmt.Errorf("get statement error:%s", err.Error())
-	}
-	result, err := stmt.Exec()
-	if err != nil {
-		return nil, fmt.Errorf("execute sql error:%s", err.Error())
-	}
-	return result, nil
+	return d.exec(sqlStr)
 }
 
 func (d *defaultHorm) Update(i interface{}, conditions ...string) (int, error) {
 	return 0, errors.New("Not yet supported")
 }
 
-func (d *defaultHorm) UpdateById(i interface{}) (int, error) {
-	return 0, errors.New("Not yet supported")
-}
-
-func (d *defaultHorm) DelById(i interface{}) (int, error) {
-	_, err := sqlGenerator.GenerateDelByIdSql(i)
+func (d *defaultHorm) UpdateById(i interface{}) (int64, error) {
+	sqlStr, err := sqlGenerator.GenerateUpdateByIdSql(i)
 	if err != nil {
 		return 0, errors.New("Generate sql failed:" + err.Error())
 	}
-	return 0, errors.New("Not yet supported")
+	res, err := d.exec(sqlStr)
+	if err != nil {
+		return 0, errors.New("Execute update operate failed:" + err.Error())
+	}
+	return res.RowsAffected()
+}
+
+func (d *defaultHorm) DelById(i interface{}) (int64, error) {
+	sqlStr, err := sqlGenerator.GenerateDelByIdSql(i)
+	if err != nil {
+		return 0, errors.New("Generate sql failed:" + err.Error())
+	}
+	res, err := d.exec(sqlStr)
+	if err != nil {
+		return 0, errors.New("Execute delete operate failed:" + err.Error())
+	}
+	return res.RowsAffected()
 }
 
 func (d *defaultHorm) Del(i interface{}, conditions ...string) (int, error) {
@@ -109,4 +113,16 @@ func (d *defaultHorm) getStatement(s string) (*sql.Stmt, error) {
 		return stmt, err
 	}
 	return d.txMap[getGID()].Prepare(s)
+}
+
+func (d *defaultHorm)exec(sqlStr string) (sql.Result, error) {
+	stmt, err := d.getStatement(sqlStr)
+	if err != nil {
+		return nil, fmt.Errorf("get statement error:%s", err.Error())
+	}
+	result, err := stmt.Exec()
+	if err != nil {
+		return nil, fmt.Errorf("execute sql error:%s", err.Error())
+	}
+	return result, nil
 }
