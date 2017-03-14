@@ -5,21 +5,22 @@ import (
 	"errors"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
+	"reflect"
 	"sync"
 )
 
 type IHorm interface {
-	List(list []interface{}, conditions ...string) error //查询列表
-	FindById(i interface{}) error                        //根据id查找
-	Save(i interface{}) (sql.Result, error)              //插入单个记录
-	UpdateById(i interface{}) (int64, error)             //根据id更新
-	DelById(i interface{}) (int64, error)                //根据id删除
-	Query(string) (int, error)                           //自定义sql
-	Exec(string) (sql.Result, error)                     //自定义sql
-	Begin() error                                        //开始事务
-	Commit() error                                       //提交事务
-	RollBack() error                                     //回滚
-	RegistMapping(i interface{}) error                   //注册映射(目前为自动注册)
+	List(list interface{}, conditions ...string) error //查询列表
+	FindById(i interface{}) error                      //根据id查找
+	Save(i interface{}) (sql.Result, error)            //插入单个记录
+	UpdateById(i interface{}) (int64, error)           //根据id更新
+	DelById(i interface{}) (int64, error)              //根据id删除
+	Query(string) (int, error)                         //自定义sql
+	Exec(string) (sql.Result, error)                   //自定义sql
+	Begin() error                                      //开始事务
+	Commit() error                                     //提交事务
+	RollBack() error                                   //回滚
+	RegistMapping(i interface{}) error                 //注册映射(目前为自动注册)
 }
 
 type defaultHorm struct {
@@ -29,8 +30,28 @@ type defaultHorm struct {
 	mutex    sync.Mutex
 }
 
-func (d *defaultHorm) List(list []interface{}, conditions ...string) error {
-	return errors.New("Not yet supported")
+func (d *defaultHorm) List(list interface{}, conditions ...string) error {
+	ele, err := getSliceElem(list)
+	if err != nil {
+		return fmt.Errorf("Get slice element failed")
+	}
+	sqlStr, err := sqlGenerator.GenerateListSql(ele)
+	if err != nil {
+		return fmt.Errorf("Generate sql error:%s", err.Error())
+	}
+	rows, err := d.query(sqlStr)
+	if err != nil {
+		return fmt.Errorf("Query select sql error:%s", err)
+	}
+	err = injectList(list, ele, rows)
+	if err != nil {
+		return fmt.Errorf("Data inject error:%s", err)
+	}
+	err = rows.Close()
+	if err != nil {
+		return fmt.Errorf("Close rows failed")
+	}
+	return nil
 }
 
 func (d *defaultHorm) FindById(i interface{}) error {
@@ -42,7 +63,7 @@ func (d *defaultHorm) FindById(i interface{}) error {
 	if err != nil {
 		return fmt.Errorf("Query select sql error:%s", err)
 	}
-	err = d.inject(i, rows, 1)
+	err = injectOne(i, rows)
 	if err != nil {
 		return fmt.Errorf("Data inject error:%s", err)
 	}
@@ -129,11 +150,11 @@ func (d *defaultHorm) getStatement(s string) (*sql.Stmt, error) {
 func (d *defaultHorm) exec(sqlStr string) (sql.Result, error) {
 	stmt, err := d.getStatement(sqlStr)
 	if err != nil {
-		return nil, fmt.Errorf("get statement error:%s", err.Error())
+		return nil, fmt.Errorf("Get statement error:%s", err.Error())
 	}
 	result, err := stmt.Exec()
 	if err != nil {
-		return nil, fmt.Errorf("execute sql error:%s", err.Error())
+		return nil, fmt.Errorf("Execute sql error:%s", err.Error())
 	}
 	err = stmt.Close()
 	if err != nil {
@@ -145,16 +166,16 @@ func (d *defaultHorm) exec(sqlStr string) (sql.Result, error) {
 func (d *defaultHorm) query(sqlStr string) (*sql.Rows, error) {
 	stmt, err := d.getStatement(sqlStr)
 	if err != nil {
-		return nil, fmt.Errorf("get statement error:%s", err.Error())
+		return nil, fmt.Errorf("Get statement error:%s", err.Error())
 	}
 	rows, err := stmt.Query()
 	if err != nil {
-		return nil, fmt.Errorf("execute sql error:%s", err.Error())
+		return nil, fmt.Errorf("Execute sql error:%s", err.Error())
 	}
 	return rows, nil
 }
 
-func (d *defaultHorm) inject(i interface{}, rows *sql.Rows, count int) error {
+func injectOne(i interface{}, rows *sql.Rows) error {
 	columns, err := rows.Columns()
 	if err != nil {
 		fmt.Errorf("Get columns error:%s", err.Error())
@@ -171,7 +192,7 @@ func (d *defaultHorm) inject(i interface{}, rows *sql.Rows, count int) error {
 	rowNum := 0
 	for rows.Next() {
 		rowNum++
-		if rowNum > count {
+		if rowNum > 1 {
 			return fmt.Errorf("Select one but found more")
 		}
 		err = rows.Scan(scans...)
@@ -179,11 +200,43 @@ func (d *defaultHorm) inject(i interface{}, rows *sql.Rows, count int) error {
 			return err
 		}
 		for k, v := range values {
-			err := setValue(sv.fieldValueMap[columns[k]], v)
+			err = setValue(sv.fieldValueMap[columns[k]], v)
 			if err != nil {
 				return fmt.Errorf("Set value failed:%s", err)
 			}
 		}
+	}
+	return nil
+}
+
+func injectList(list interface{}, ele interface{}, rows *sql.Rows) error {
+	columns, err := rows.Columns()
+	if err != nil {
+		fmt.Errorf("Get columns error:%s", err.Error())
+	}
+	values := make([]sql.RawBytes, len(columns))
+	scans := make([]interface{}, len(columns))
+	for index, _ := range values {
+		scans[index] = &values[index]
+	}
+	listValue := reflect.ValueOf(list).Elem()
+	sv, err := getStructValue(ele)
+	if err != nil {
+		fmt.Errorf("Get element struct info failed")
+	}
+	for rows.Next() {
+		err = rows.Scan(scans...)
+		if err != nil {
+			return err
+		}
+		for k, v := range values {
+			f := sv.fieldValueMap[columns[k]]
+			err = setValue(f, v)
+			if err != nil {
+				return fmt.Errorf("Set value failed:%s", err)
+			}
+		}
+		listValue.Set(reflect.Append(listValue, *sv.value))
 	}
 	return nil
 }

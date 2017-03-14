@@ -12,17 +12,19 @@ import (
 type StructInfo struct {
 	kind           string                          //类型名
 	tableName      string                          //表名
-	structFieldMap map[string]*reflect.StructField //字段字典集合
+	structFieldMap map[string]*reflect.StructField //字段名->字段反射信息
+	columnFieldMap map[string]string               //列名->字段名
 	pkField        *reflect.StructField            //主键
 }
 
 //结构体字段值
-type structFieldValue struct {
+type structValue struct {
+	value          *reflect.Value            //结构体的值
 	tableName      string                    //表名
 	kind           string                    //字段类型
-	fieldStringMap map[string]string         //字段属性值
-	fieldValueMap  map[string]*reflect.Value //字段属性值
-	pkValue        string                    //主键值
+	fieldStringMap map[string]string         //列名->字符串值
+	fieldValueMap  map[string]*reflect.Value //列名->反射值
+	pkStringValue  string                    //主键字符串值
 	pkName         string                    //主键的值
 	autoIncrease   bool                      //是否自增长
 }
@@ -33,7 +35,7 @@ var structInfoMap map[string]*StructInfo
 func getStuctInfo(i interface{}) (*StructInfo, error) {
 	t := reflect.TypeOf(i)
 	kind := t.Kind()
-	if kind == reflect.Ptr {
+	if kind == reflect.Ptr || kind == reflect.Slice {
 		t = t.Elem()
 		kind = t.Kind()
 	}
@@ -47,7 +49,7 @@ func getStuctInfo(i interface{}) (*StructInfo, error) {
 	sfMap := make(map[string]*reflect.StructField)
 	for j := 0; j < t.NumField(); j++ {
 		sf := t.Field(j)
-		field := sf.Tag.Get("field")
+		field := sf.Tag.Get(COLUMN_TAG)
 		if field != "" || sf.Tag.Get("default") != "" {
 			if field == "id" {
 				primarayKeyField = &sf
@@ -65,12 +67,12 @@ func getStuctInfo(i interface{}) (*StructInfo, error) {
 }
 
 //获取结构体字段值
-func getStructValue(i interface{}) (*structFieldValue, error) {
+func getStructValue(i interface{}) (*structValue, error) {
 	v := reflect.Indirect(reflect.ValueOf(i))
-	kind := v.Type().Kind()
+	kind := v.Kind()
 	sf, err := getStuctInfo(i)
 	if err != nil {
-		return nil, fmt.Errorf("get struct info [%s] failed", kind)
+		return nil, fmt.Errorf("get struct info [%s] failed", v.Type().Name())
 	}
 	stringMap := make(map[string]string)
 	valueMap := make(map[string]*reflect.Value)
@@ -83,13 +85,16 @@ func getStructValue(i interface{}) (*structFieldValue, error) {
 		if err != nil {
 			return nil, fmt.Errorf("convert [value=%s type=%s] error", value.Type(), value.Kind().String())
 		}
-		stringMap[structField.Tag.Get("field")] = convertedValue
-		valueMap[structField.Tag.Get("field")] = &value
+		stringMap[structField.Tag.Get(COLUMN_TAG)] = convertedValue
+		valueMap[structField.Tag.Get(COLUMN_TAG)] = &value
 	}
+	//存放主键字段到valueMap里
+	pkValue := v.FieldByName(sf.pkField.Name)
+	valueMap[sf.pkField.Tag.Get(COLUMN_TAG)] = &pkValue
 	if !v.FieldByName(sf.pkField.Name).CanSet() {
 		return nil, fmt.Errorf("primary key is unexported")
 	}
-	pkValue, err := convertString(v.FieldByName(sf.pkField.Name), sf.pkField.Type.Kind())
+	pkStringValue, err := convertString(v.FieldByName(sf.pkField.Name), sf.pkField.Type.Kind())
 	if err != nil {
 		return nil, fmt.Errorf("convert id error")
 	}
@@ -97,7 +102,16 @@ func getStructValue(i interface{}) (*structFieldValue, error) {
 	if "auto" == sf.pkField.Tag.Get("default") {
 		autoIncrease = true
 	}
-	return &structFieldValue{kind: kind.String(), fieldValueMap: valueMap, fieldStringMap: stringMap, pkName: sf.pkField.Tag.Get("field"), pkValue: pkValue, tableName: sf.tableName, autoIncrease: autoIncrease}, nil
+	return &structValue{value: &v, kind: kind.String(), fieldValueMap: valueMap, fieldStringMap: stringMap, pkName: sf.pkField.Tag.Get(COLUMN_TAG), pkStringValue: pkStringValue, tableName: sf.tableName, autoIncrease: autoIncrease}, nil
+}
+
+func getSliceElem(list interface{}) (interface{}, error) {
+	v := reflect.Indirect(reflect.ValueOf(list))
+	if v.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("[%s] not a slice", v.Kind())
+	}
+	elementType := v.Type().Elem()
+	return reflect.New(elementType).Interface(), nil
 }
 
 func convertString(v reflect.Value, k reflect.Kind) (string, error) {

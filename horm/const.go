@@ -1,5 +1,6 @@
 package horm
 
 const (
-	MYSQL string = "mysql"
+	MYSQL      string = "mysql"
+	COLUMN_TAG string = "field"
 )

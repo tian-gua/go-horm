@@ -26,16 +26,13 @@ type defaultSqlGenerator struct {
 }
 
 func (d *defaultSqlGenerator) GenerateListSql(i interface{}, conditions ...string) (string, error) {
-	structValue, err := getStructValue(i)
+	structInfo, err := getStuctInfo(i)
 	if err != nil {
-		return "", fmt.Errorf("get struct value error:%s", err.Error())
+		return "", fmt.Errorf("Get struct info error:%s", err.Error())
 	}
-	if structValue.pkName == "" || structValue.pkValue == "" {
-		return "", fmt.Errorf("id can not be empty")
-	}
-	fields := ""
-	for k, _ := range structValue.fieldStringMap {
-		fields += k + ","
+	fields := structInfo.pkField.Tag.Get(COLUMN_TAG) + ","
+	for _, v := range structInfo.structFieldMap {
+		fields += v.Tag.Get(COLUMN_TAG) + ","
 	}
 	fields = strings.TrimSuffix(fields, ",")
 	where := ""
@@ -54,7 +51,7 @@ func (d *defaultSqlGenerator) GenerateListSql(i interface{}, conditions ...strin
 	if sort != "" {
 		sort = "ORDER BY " + sort
 	}
-	s := fmt.Sprintf("SELECT %s FROM %s %s %s", fields, structValue.tableName, where, sort)
+	s := fmt.Sprintf("SELECT %s FROM %s %s %s", fields, structInfo.tableName, where, sort)
 	color.Green("[horm]εε[%s]:\t%s", time.Now().Format("2006-01-02 15:04:05"), s)
 	return s, nil
 }
@@ -62,9 +59,9 @@ func (d *defaultSqlGenerator) GenerateListSql(i interface{}, conditions ...strin
 func (d *defaultSqlGenerator) GenerateFindByIdSql(i interface{}) (string, error) {
 	structValue, err := getStructValue(i)
 	if err != nil {
-		return "", fmt.Errorf("get struct value error:%s", err.Error())
+		return "", fmt.Errorf("Get struct value error:%s", err.Error())
 	}
-	if structValue.pkName == "" || structValue.pkValue == "" {
+	if structValue.pkName == "" || structValue.pkStringValue == "" {
 		return "", fmt.Errorf("id can not be empty")
 	}
 
@@ -73,7 +70,7 @@ func (d *defaultSqlGenerator) GenerateFindByIdSql(i interface{}) (string, error)
 		fields += k + ","
 	}
 	fields = strings.TrimSuffix(fields, ",")
-	s := fmt.Sprintf("SELECT %s FROM %s WHERE %s = %s", fields, structValue.tableName, structValue.pkName, structValue.pkValue)
+	s := fmt.Sprintf("SELECT %s FROM %s WHERE %s = %s", fields, structValue.tableName, structValue.pkName, structValue.pkStringValue)
 	color.Green("[horm]εε[%s]:\t%s", time.Now().Format("2006-01-02 15:04:05"), s)
 	return s, nil
 }
@@ -81,9 +78,9 @@ func (d *defaultSqlGenerator) GenerateFindByIdSql(i interface{}) (string, error)
 func (d *defaultSqlGenerator) GenerateSaveSql(i interface{}) (string, error) {
 	structValue, err := getStructValue(i)
 	if err != nil {
-		return "", fmt.Errorf("get struct value error:%s", err.Error())
+		return "", fmt.Errorf("Get struct value error:%s", err.Error())
 	}
-	if structValue.pkName == "" || structValue.pkValue == "" {
+	if structValue.pkName == "" || structValue.pkStringValue == "" {
 		color.Red("there is no primary key")
 	}
 	if len(structValue.fieldStringMap) == 0 {
@@ -94,7 +91,7 @@ func (d *defaultSqlGenerator) GenerateSaveSql(i interface{}) (string, error) {
 	if structValue.autoIncrease {
 		values += "DEFAULT"
 	} else {
-		values += structValue.pkValue
+		values += structValue.pkStringValue
 	}
 	for k, v := range structValue.fieldStringMap {
 		fileds += "," + k
@@ -108,9 +105,9 @@ func (d *defaultSqlGenerator) GenerateSaveSql(i interface{}) (string, error) {
 func (d *defaultSqlGenerator) GenerateUpdateByIdSql(i interface{}) (string, error) {
 	structValue, err := getStructValue(i)
 	if err != nil {
-		return "", fmt.Errorf("get struct value error:%s", err.Error())
+		return "", fmt.Errorf("Get struct value error:%s", err.Error())
 	}
-	if structValue.pkName == "" || structValue.pkValue == "" {
+	if structValue.pkName == "" || structValue.pkStringValue == "" {
 		return "", fmt.Errorf("id can not be empty")
 	}
 	if len(structValue.fieldStringMap) == 0 {
@@ -121,7 +118,7 @@ func (d *defaultSqlGenerator) GenerateUpdateByIdSql(i interface{}) (string, erro
 		set += k + " = " + v + ", "
 	}
 	set = strings.TrimSuffix(set, ", ")
-	s := "UPDATE " + structValue.tableName + " SET " + set + " WHERE " + structValue.pkName + " = " + structValue.pkValue
+	s := "UPDATE " + structValue.tableName + " SET " + set + " WHERE " + structValue.pkName + " = " + structValue.pkStringValue
 	color.Green("[horm]εε[%s]:\t%s", time.Now().Format("2006-01-02 15:04:05"), s)
 	return s, nil
 }
@@ -129,12 +126,12 @@ func (d *defaultSqlGenerator) GenerateUpdateByIdSql(i interface{}) (string, erro
 func (d *defaultSqlGenerator) GenerateDelByIdSql(i interface{}) (string, error) {
 	structValue, err := getStructValue(i)
 	if err != nil {
-		return "", fmt.Errorf("get struct value error:%s", err.Error())
+		return "", fmt.Errorf("Get struct value error:%s", err.Error())
 	}
-	if structValue.pkName == "" || structValue.pkValue == "" {
+	if structValue.pkName == "" || structValue.pkStringValue == "" {
 		return "", fmt.Errorf("id can not be empty")
 	}
-	s := fmt.Sprintf("DELETE FROM %s WHERE %s = %s", structValue.tableName, structValue.pkName, structValue.pkValue)
+	s := fmt.Sprintf("DELETE FROM %s WHERE %s = %s", structValue.tableName, structValue.pkName, structValue.pkStringValue)
 	color.Green("[horm]εε[%s]:\t%s", time.Now().Format("2006-01-02 15:04:05"), s)
 	return s, nil
 }

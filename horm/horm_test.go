@@ -40,7 +40,7 @@ func TestHorm(t *testing.T) {
 	dealError(err)
 	t.Logf("%+v", th2)
 
-	th2.Description = "更新horm"
+	th2.Description = "更新 horm"
 	rows, err = horm.UpdateById(th2)
 	dealError(err)
 	t.Logf("更新了[%d]条记录", rows)
@@ -50,6 +50,13 @@ func TestHorm(t *testing.T) {
 	err = horm.FindById(th2)
 	dealError(err)
 	t.Logf("%+v", th2)
+
+	ths := new([]testHorm)
+	err = horm.List(ths)
+	dealError(err)
+	for _, v := range *ths {
+		t.Logf("%+v", v)
+	}
 
 	//提交事务
 	err = horm.Commit()
