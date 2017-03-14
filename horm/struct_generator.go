@@ -16,11 +16,12 @@ func GenerateStruct(h IHorm, tableName string, structName string) (string, error
 	if err != nil {
 		return "", fmt.Errorf("Generate table struct failed:%s", err.Error())
 	}
-	structStr := fmt.Sprintf("\ntype %s struct{\n", structName)
+	structStr := fmt.Sprintf("\ntype %s struct {\n", structName)
 	for _, v := range *ts {
 		structStr += fmt.Sprintf("\t%-20s %-20s `field:\"%s\"`\n", getCamelString(v.Field), getStructType(v.Type), v.Field)
 	}
-	structStr += "}"
+	structStr += "}\n"
+	structStr += fmt.Sprintf("func (%s *%s)GetTableName() string {\n\treturn \"%s\"\n}", ([]byte(structName))[0:1], structName, tableName)
 	return structStr, nil
 }
 
