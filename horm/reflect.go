@@ -95,22 +95,27 @@ func getStructValue(i interface{}) (*structValue, error) {
 		valueMap[structField.Tag.Get(COLUMN_TAG)] = &value
 	}
 	/*end*/
+	sv := &structValue{value: &v, fieldValueMap: valueMap, fieldStringMap: stringMap, tableName: sf.tableName}
 	/*获取主键字段的值,校验主键字段是否可导出和是否是自增*/
-	pkValue := v.FieldByName(sf.pkField.Name)
-	valueMap[sf.pkField.Tag.Get(COLUMN_TAG)] = &pkValue
-	if !v.FieldByName(sf.pkField.Name).CanSet() {
-		return nil, fmt.Errorf("primary key is unexported")
-	}
-	pkStringValue, err := convertString(v.FieldByName(sf.pkField.Name), sf.pkField.Type.Kind())
-	if err != nil {
-		return nil, fmt.Errorf("convert id error:%s", err.Error())
-	}
-	autoIncrease := false
-	if "auto" == sf.pkField.Tag.Get("default") {
-		autoIncrease = true
+	if sf.pkField != nil {
+		sv.pkColumnName = sf.pkField.Tag.Get(COLUMN_TAG) //设置主键的列名
+		pkValue := v.FieldByName(sf.pkField.Name)        //获取主键的反射值
+		valueMap[sf.pkField.Tag.Get(COLUMN_TAG)] = &pkValue
+		if !v.FieldByName(sf.pkField.Name).CanSet() {
+			return nil, fmt.Errorf("primary key is unexported")
+		}
+		pkStringValue, err := convertString(v.FieldByName(sf.pkField.Name), sf.pkField.Type.Kind())
+		if err != nil {
+			return nil, fmt.Errorf("convert id error:%s", err.Error())
+		}
+		sv.pkStringValue = pkStringValue
+		if "auto" == sf.pkField.Tag.Get("default") {
+			autoIncrease := true
+			sv.autoIncrease = autoIncrease
+		}
 	}
 	/*end*/
-	return &structValue{value: &v, fieldValueMap: valueMap, fieldStringMap: stringMap, pkColumnName: sf.pkField.Tag.Get(COLUMN_TAG), pkStringValue: pkStringValue, tableName: sf.tableName, autoIncrease: autoIncrease}, nil
+	return sv, nil
 }
 
 //获取切片的元素

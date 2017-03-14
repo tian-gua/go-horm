@@ -134,7 +134,6 @@ func (d *defaultHorm) Query(s string, i interface{}) error {
 			return fmt.Errorf("Get slice element failed")
 		}
 		if reflect.TypeOf(ele).Elem().Kind() == reflect.Struct {
-
 			err = injectStructList(i, ele, rows)
 		} else {
 			err = injectOneFieldList(i, ele, rows)
@@ -287,9 +286,11 @@ func injectStructList(list interface{}, ele interface{}, rows *sql.Rows) error {
 		}
 		for k, v := range values {
 			f := sv.fieldValueMap[columns[k]]
-			err = setValue(f, v)
-			if err != nil {
-				return fmt.Errorf("Set value failed:%s", err)
+			if f != nil {
+				err = setValue(f, v)
+				if err != nil {
+					return fmt.Errorf("Set value failed:%s", err)
+				}
 			}
 		}
 		listValue.Set(reflect.Append(listValue, *sv.value))

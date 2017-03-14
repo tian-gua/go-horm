@@ -6,6 +6,8 @@ import (
 	"github.com/fatih/color"
 	"strconv"
 	"time"
+	"fmt"
+	"sync"
 )
 
 type IHormManager interface {
@@ -20,7 +22,7 @@ type HormManager struct {
 }
 
 func (m *HormManager) Connect(url string, port int, userName string, passWord string, dbName string) (int64, error) {
-	db, err := sql.Open(MYSQL, userName+":"+passWord+"@tcp("+url+":"+strconv.Itoa(port)+")/"+dbName)
+	db, err := sql.Open(MYSQL, userName + ":" + passWord + "@tcp(" + url + ":" + strconv.Itoa(port) + ")/" + dbName)
 	if err != nil {
 		panic(errors.New("Not connected to the database:" + err.Error()))
 	}
@@ -44,12 +46,29 @@ func (m *HormManager) CloseAll() error {
 	return nil
 }
 
+var hormManager IHormManager = nil
+var lock sync.Mutex
+
 //创建一个新的horm管理器
 func New() IHormManager {
-	return &HormManager{dbMap: make(map[int64]*sql.DB)}
+	lock.Lock()
+	if hormManager == nil {
+		hormManager = &HormManager{dbMap: make(map[int64]*sql.DB)}
+	}
+	lock.Unlock()
+	return hormManager
 }
 
 //创建默认的Horm
 func newDefaultHorm(db *sql.DB) IHorm {
 	return &defaultHorm{db: db, mappings: newResultMap(), txMap: make(map[uint64]*sql.Tx)}
+}
+
+func FastCreate(url string, port int, userName string, passWord string, dbName string) (IHorm, error) {
+	hormManager := New()
+	did, err := hormManager.Connect(url, port, userName, passWord, dbName)
+	if err != nil {
+		return nil, fmt.Errorf("Fast create horm failed:%s", err)
+	}
+	return hormManager.Create(did), nil
 }
