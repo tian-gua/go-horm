@@ -53,6 +53,20 @@ func TestHorm(t *testing.T) {
 	dealError(err)
 	t.Logf("更新了[%d]条记录", rows)
 
+	//自定义查询单条记录操作
+	single := &testHorm{}
+	err = horm.Query("select * from tb_test where id = 9", single)
+	dealError(err)
+	t.Logf("%+v", single)
+
+	//自定义查询单条记录操作
+	list := new([]testHorm)
+	err = horm.Query("select * from tb_test", list)
+	dealError(err)
+	for _, v := range *list {
+		t.Logf("%+v", v)
+	}
+
 	//自定义查询单个字段操作
 	tp := 0
 	err = horm.Query("select type from tb_test where id = 9", &tp)
@@ -62,6 +76,14 @@ func TestHorm(t *testing.T) {
 	err = horm.Query("select description from tb_test where id = 9", &des)
 	dealError(err)
 	t.Logf("description=%s", des)
+
+	//自定义查询单个列表操作
+	ids := new([]*int)
+	err = horm.Query("select id from tb_test", ids)
+	dealError(err)
+	for _, v := range *ids {
+		t.Logf("id=%d", *v)
+	}
 
 	//查询id = 9的struct
 	th2 = &testHorm{Id: 9}

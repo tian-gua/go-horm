@@ -43,7 +43,7 @@ func (d *defaultHorm) List(list interface{}, conditions ...string) error {
 	if err != nil {
 		return fmt.Errorf("Query select sql error:%s", err)
 	}
-	err = injectList(list, ele, rows)
+	err = injectStructList(list, ele, rows)
 	if err != nil {
 		return fmt.Errorf("Data inject error:%s", err)
 	}
@@ -126,9 +126,22 @@ func (d *defaultHorm) Query(s string, i interface{}) error {
 	switch t.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.String:
 		err = injectOneField(i, rows)
+	case reflect.Struct:
+		err = injectOneStruct(i, rows)
+	case reflect.Slice:
+		ele, err := getSliceElem(i)
 		if err != nil {
-			return fmt.Errorf("Inject one field failed:%s", err.Error())
+			return fmt.Errorf("Get slice element failed")
 		}
+		if reflect.TypeOf(ele).Elem().Kind() == reflect.Struct {
+
+			err = injectStructList(i, ele, rows)
+		} else {
+			err = injectOneFieldList(i, ele, rows)
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("Inject one field failed:%s", err.Error())
 	}
 	err = rows.Close()
 	if err != nil {
@@ -229,7 +242,26 @@ func injectOneStruct(i interface{}, rows *sql.Rows) error {
 	return nil
 }
 
-func injectList(list interface{}, ele interface{}, rows *sql.Rows) error {
+func injectOneFieldList(list interface{}, ele interface{}, rows *sql.Rows) error {
+	columns, err := rows.Columns()
+	if err != nil {
+		fmt.Errorf("Get columns error:%s", err.Error())
+	}
+	if len(columns) != 1 {
+		fmt.Errorf("Result not a single column")
+	}
+	listValue := reflect.ValueOf(list).Elem()
+	for rows.Next() {
+		err = rows.Scan(ele)
+		if err != nil {
+			return err
+		}
+		listValue.Set(reflect.Append(listValue, reflect.ValueOf(ele).Elem()))
+	}
+	return nil
+}
+
+func injectStructList(list interface{}, ele interface{}, rows *sql.Rows) error {
 	columns, err := rows.Columns()
 	if err != nil {
 		fmt.Errorf("Get columns error:%s", err.Error())
