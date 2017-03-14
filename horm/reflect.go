@@ -32,23 +32,28 @@ var structInfoMap map[string]*StructInfo
 //获取结构体字段类型信息
 func getStuctInfo(i interface{}) (*StructInfo, error) {
 	t := reflect.TypeOf(i)
+	/*校验参数是否是指针或者切片,如果是,则获取指向的元素的反射类型信息,如果参数不是结构体指针或者切片,返回错误*/
 	kind := t.Kind()
 	if kind == reflect.Ptr || kind == reflect.Slice {
 		t = t.Elem()
 		kind = t.Kind()
 	}
-	if v, ok := structInfoMap[kind.String()]; ok {
-		return v, nil
-	}
 	if kind != reflect.Struct {
 		return nil, fmt.Errorf("[%s] is not struct", kind)
 	}
+	/*end*/
+	/*从缓存中获反射信息*/
+	if v, ok := structInfoMap[kind.String()]; ok {
+		return v, nil
+	}
+	/*end*/
 	var primarayKeyField *reflect.StructField = nil
 	sfMap := make(map[string]*reflect.StructField)
+	/*遍历结构体字段,保存带有field标签的字段类型信息*/
 	for j := 0; j < t.NumField(); j++ {
 		sf := t.Field(j)
 		field := sf.Tag.Get(COLUMN_TAG)
-		if field != "" || sf.Tag.Get("default") != "" {
+		if field != "" {
 			if field == "id" {
 				primarayKeyField = &sf
 			} else {
@@ -56,23 +61,27 @@ func getStuctInfo(i interface{}) (*StructInfo, error) {
 			}
 		}
 	}
+	/*end*/
 	si := &StructInfo{structFieldMap: sfMap, pkField: primarayKeyField}
+	/*通过table接口调用GetTableName方法获取表名*/
 	if table, ok := i.(Table); ok {
 		si.tableName = table.GetTableName()
 	}
-	structInfoMap[kind.String()] = si
+	/*end*/
+	structInfoMap[kind.String()] = si //存放结构体类型信息到缓存里
 	return si, nil
 }
 
 //获取结构体字段值
 func getStructValue(i interface{}) (*structValue, error) {
 	v := reflect.Indirect(reflect.ValueOf(i))
-	sf, err := getStuctInfo(i)
+	sf, err := getStuctInfo(i) //获取参数类型反射信息
 	if err != nil {
 		return nil, fmt.Errorf("get struct info [%s] failed", v.Type().Name())
 	}
 	stringMap := make(map[string]string)
 	valueMap := make(map[string]*reflect.Value)
+	/*遍历结构体类型信息中保存的字段(过滤非field标签字段),并过滤非可导出的字段,获取字段的值*/
 	for fieldName, structField := range sf.structFieldMap {
 		value := v.FieldByName(fieldName)
 		if !value.CanSet() {
@@ -85,7 +94,8 @@ func getStructValue(i interface{}) (*structValue, error) {
 		stringMap[structField.Tag.Get(COLUMN_TAG)] = convertedValue
 		valueMap[structField.Tag.Get(COLUMN_TAG)] = &value
 	}
-	//存放主键字段到valueMap里
+	/*end*/
+	/*获取主键字段的值,校验主键字段是否可导出和是否是自增*/
 	pkValue := v.FieldByName(sf.pkField.Name)
 	valueMap[sf.pkField.Tag.Get(COLUMN_TAG)] = &pkValue
 	if !v.FieldByName(sf.pkField.Name).CanSet() {
@@ -93,15 +103,17 @@ func getStructValue(i interface{}) (*structValue, error) {
 	}
 	pkStringValue, err := convertString(v.FieldByName(sf.pkField.Name), sf.pkField.Type.Kind())
 	if err != nil {
-		return nil, fmt.Errorf("convert id error")
+		return nil, fmt.Errorf("convert id error:%s", err.Error())
 	}
 	autoIncrease := false
 	if "auto" == sf.pkField.Tag.Get("default") {
 		autoIncrease = true
 	}
+	/*end*/
 	return &structValue{value: &v, fieldValueMap: valueMap, fieldStringMap: stringMap, pkColumnName: sf.pkField.Tag.Get(COLUMN_TAG), pkStringValue: pkStringValue, tableName: sf.tableName, autoIncrease: autoIncrease}, nil
 }
 
+//获取切片的元素
 func getSliceElem(list interface{}) (interface{}, error) {
 	v := reflect.Indirect(reflect.ValueOf(list))
 	if v.Kind() != reflect.Slice {
@@ -111,6 +123,7 @@ func getSliceElem(list interface{}) (interface{}, error) {
 	return reflect.New(elementType).Interface(), nil
 }
 
+//转换反射值为字符串值
 func convertString(v reflect.Value, k reflect.Kind) (string, error) {
 	switch k {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -120,13 +133,12 @@ func convertString(v reflect.Value, k reflect.Kind) (string, error) {
 	case reflect.Struct:
 		if t, ok := v.Interface().(time.Time); ok {
 			return t.Format("'2006-01-02 15:04:05'"), nil
-		} else {
-			return "", fmt.Errorf("type ")
 		}
 	}
-	return "", fmt.Errorf("convert value to string error")
+	return "", fmt.Errorf("convert value to string error:not support type[%s]", v.Type().Name())
 }
 
+//通过反射设置一个字段的值
 func setValue(v *reflect.Value, rb sql.RawBytes) error {
 	k := v.Kind()
 	switch k {

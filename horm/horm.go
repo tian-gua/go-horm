@@ -186,6 +186,7 @@ func (d *defaultHorm) query(sqlStr string) (*sql.Rows, *sql.Stmt, error) {
 	return rows, stmt, nil
 }
 
+//向单个字段注入数据
 func injectOneField(i interface{}, rows *sql.Rows) error {
 	columns, err := rows.Columns()
 	if err != nil {
@@ -208,6 +209,7 @@ func injectOneField(i interface{}, rows *sql.Rows) error {
 	return nil
 }
 
+//向单个结构体注入数据
 func injectOneStruct(i interface{}, rows *sql.Rows) error {
 	columns, err := rows.Columns()
 	if err != nil {
@@ -242,6 +244,7 @@ func injectOneStruct(i interface{}, rows *sql.Rows) error {
 	return nil
 }
 
+//向单个字段切片注入数据
 func injectOneFieldList(list interface{}, ele interface{}, rows *sql.Rows) error {
 	columns, err := rows.Columns()
 	if err != nil {
@@ -261,6 +264,7 @@ func injectOneFieldList(list interface{}, ele interface{}, rows *sql.Rows) error
 	return nil
 }
 
+//向结构体切片注入数据
 func injectStructList(list interface{}, ele interface{}, rows *sql.Rows) error {
 	columns, err := rows.Columns()
 	if err != nil {
