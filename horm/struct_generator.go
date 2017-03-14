@@ -18,7 +18,7 @@ func GenerateStruct(h IHorm, tableName string, structName string) (string, error
 	}
 	structStr := fmt.Sprintf("\ntype %s struct{\n", structName)
 	for _, v := range *ts {
-		structStr += fmt.Sprintf("\t%-20s %-20s\n", v.Field, getStructType(v.Type))
+		structStr += fmt.Sprintf("\t%-20s %-20s `field:\"%s\"`\n", getCamelString(v.Field), getStructType(v.Type), v.Field)
 	}
 	structStr += "}"
 	return structStr, nil
@@ -33,4 +33,13 @@ func getStructType(dbType string) string {
 		return "time.Time"
 	}
 	return "unknown"
+}
+
+func getCamelString(unCamelString string) string {
+	s := strings.Split(unCamelString, "_")
+	camelString := ""
+	for _, v := range s {
+		camelString += strings.Title(v)
+	}
+	return camelString
 }
