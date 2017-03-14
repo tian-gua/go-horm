@@ -10,7 +10,6 @@ import (
 
 //结构体信息
 type StructInfo struct {
-	kind           string                          //类型名
 	tableName      string                          //表名
 	structFieldMap map[string]*reflect.StructField //字段名->字段反射信息
 	columnFieldMap map[string]string               //列名->字段名
@@ -21,11 +20,10 @@ type StructInfo struct {
 type structValue struct {
 	value          *reflect.Value            //结构体的值
 	tableName      string                    //表名
-	kind           string                    //字段类型
 	fieldStringMap map[string]string         //列名->字符串值
 	fieldValueMap  map[string]*reflect.Value //列名->反射值
 	pkStringValue  string                    //主键字符串值
-	pkName         string                    //主键的值
+	pkColumnName   string                    //主键的列名
 	autoIncrease   bool                      //是否自增长
 }
 
@@ -58,7 +56,7 @@ func getStuctInfo(i interface{}) (*StructInfo, error) {
 			}
 		}
 	}
-	si := &StructInfo{kind: t.Kind().String(), structFieldMap: sfMap, pkField: primarayKeyField}
+	si := &StructInfo{structFieldMap: sfMap, pkField: primarayKeyField}
 	if table, ok := i.(Table); ok {
 		si.tableName = table.GetTableName()
 	}
@@ -69,7 +67,6 @@ func getStuctInfo(i interface{}) (*StructInfo, error) {
 //获取结构体字段值
 func getStructValue(i interface{}) (*structValue, error) {
 	v := reflect.Indirect(reflect.ValueOf(i))
-	kind := v.Kind()
 	sf, err := getStuctInfo(i)
 	if err != nil {
 		return nil, fmt.Errorf("get struct info [%s] failed", v.Type().Name())
@@ -102,7 +99,7 @@ func getStructValue(i interface{}) (*structValue, error) {
 	if "auto" == sf.pkField.Tag.Get("default") {
 		autoIncrease = true
 	}
-	return &structValue{value: &v, kind: kind.String(), fieldValueMap: valueMap, fieldStringMap: stringMap, pkName: sf.pkField.Tag.Get(COLUMN_TAG), pkStringValue: pkStringValue, tableName: sf.tableName, autoIncrease: autoIncrease}, nil
+	return &structValue{value: &v, fieldValueMap: valueMap, fieldStringMap: stringMap, pkColumnName: sf.pkField.Tag.Get(COLUMN_TAG), pkStringValue: pkStringValue, tableName: sf.tableName, autoIncrease: autoIncrease}, nil
 }
 
 func getSliceElem(list interface{}) (interface{}, error) {

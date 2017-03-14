@@ -15,7 +15,7 @@ type IHorm interface {
 	Save(i interface{}) (sql.Result, error)            //插入单个记录
 	UpdateById(i interface{}) (int64, error)           //根据id更新
 	DelById(i interface{}) (int64, error)              //根据id删除
-	Query(string) (int, error)                         //自定义sql
+	Query(string, interface{}) error                   //自定义sql
 	Exec(string) (sql.Result, error)                   //自定义sql
 	Begin() error                                      //开始事务
 	Commit() error                                     //提交事务
@@ -39,7 +39,7 @@ func (d *defaultHorm) List(list interface{}, conditions ...string) error {
 	if err != nil {
 		return fmt.Errorf("Generate sql error:%s", err.Error())
 	}
-	rows, err := d.query(sqlStr)
+	rows, stmt, err := d.query(sqlStr)
 	if err != nil {
 		return fmt.Errorf("Query select sql error:%s", err)
 	}
@@ -51,6 +51,10 @@ func (d *defaultHorm) List(list interface{}, conditions ...string) error {
 	if err != nil {
 		return fmt.Errorf("Close rows failed")
 	}
+	err = stmt.Close()
+	if err != nil {
+		return fmt.Errorf("Close statement error:%s", err.Error())
+	}
 	return nil
 }
 
@@ -59,17 +63,21 @@ func (d *defaultHorm) FindById(i interface{}) error {
 	if err != nil {
 		return fmt.Errorf("generate sql error:%s", err.Error())
 	}
-	rows, err := d.query(sqlStr)
+	rows, stmt, err := d.query(sqlStr)
 	if err != nil {
 		return fmt.Errorf("Query select sql error:%s", err)
 	}
-	err = injectOne(i, rows)
+	err = injectOneStruct(i, rows)
 	if err != nil {
 		return fmt.Errorf("Data inject error:%s", err)
 	}
 	err = rows.Close()
 	if err != nil {
 		return fmt.Errorf("Close rows failed")
+	}
+	err = stmt.Close()
+	if err != nil {
+		return fmt.Errorf("Close statement error:%s", err.Error())
 	}
 	return nil
 }
@@ -106,45 +114,35 @@ func (d *defaultHorm) DelById(i interface{}) (int64, error) {
 	return res.RowsAffected()
 }
 
-func (d *defaultHorm) Query(s string) (int, error) {
-	return 0, errors.New("Not yet supported")
-}
-
-func (d *defaultHorm) Exec(string) (sql.Result, error) {
-	return nil, errors.New("Not yet supported")
-}
-
-func (d *defaultHorm) Begin() error {
-	d.mutex.Lock()
-	var err error
-	tx, err := d.db.Begin()
-	if err != nil {
-		return errors.New("Begin transaction err:" + err.Error())
+func (d *defaultHorm) Query(s string, i interface{}) error {
+	t := reflect.TypeOf(i)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
-	d.txMap[getGID()] = tx
+	rows, stmt, err := d.query(s)
+	if err != nil {
+		return fmt.Errorf("Query select sql error:%s", err)
+	}
+	switch t.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.String:
+		err = injectOneField(i, rows)
+		if err != nil {
+			return fmt.Errorf("Inject one field failed:%s", err.Error())
+		}
+	}
+	err = rows.Close()
+	if err != nil {
+		return fmt.Errorf("Close rows failed:%s", err.Error())
+	}
+	err = stmt.Close()
+	if err != nil {
+		return fmt.Errorf("Close statement error:%s", err.Error())
+	}
 	return nil
 }
 
-func (d *defaultHorm) Commit() error {
-	defer d.mutex.Unlock()
-	return d.txMap[getGID()].Commit()
-}
-
-func (d *defaultHorm) RollBack() error {
-	defer d.mutex.Unlock()
-	return d.txMap[getGID()].Rollback()
-}
-
-func (d *defaultHorm) RegistMapping(i interface{}) error {
-	return errors.New("Not yet supported")
-}
-
-func (d *defaultHorm) getStatement(s string) (*sql.Stmt, error) {
-	if d.txMap[getGID()] == nil {
-		stmt, err := d.db.Prepare(s)
-		return stmt, err
-	}
-	return d.txMap[getGID()].Prepare(s)
+func (d *defaultHorm) Exec(s string) (sql.Result, error) {
+	return d.exec(s)
 }
 
 func (d *defaultHorm) exec(sqlStr string) (sql.Result, error) {
@@ -163,19 +161,41 @@ func (d *defaultHorm) exec(sqlStr string) (sql.Result, error) {
 	return result, nil
 }
 
-func (d *defaultHorm) query(sqlStr string) (*sql.Rows, error) {
+func (d *defaultHorm) query(sqlStr string) (*sql.Rows, *sql.Stmt, error) {
 	stmt, err := d.getStatement(sqlStr)
 	if err != nil {
-		return nil, fmt.Errorf("Get statement error:%s", err.Error())
+		return nil, nil, fmt.Errorf("Get statement error:%s", err.Error())
 	}
 	rows, err := stmt.Query()
 	if err != nil {
-		return nil, fmt.Errorf("Execute sql error:%s", err.Error())
+		return nil, nil, fmt.Errorf("Execute sql error:%s", err.Error())
 	}
-	return rows, nil
+	return rows, stmt, nil
 }
 
-func injectOne(i interface{}, rows *sql.Rows) error {
+func injectOneField(i interface{}, rows *sql.Rows) error {
+	columns, err := rows.Columns()
+	if err != nil {
+		fmt.Errorf("Get columns error:%s", err.Error())
+	}
+	if len(columns) != 1 {
+		fmt.Errorf("Result not a single column")
+	}
+	rowNum := 0
+	for rows.Next() {
+		rowNum++
+		if rowNum > 1 {
+			return fmt.Errorf("Select one but found more")
+		}
+		err = rows.Scan(i)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func injectOneStruct(i interface{}, rows *sql.Rows) error {
 	columns, err := rows.Columns()
 	if err != nil {
 		fmt.Errorf("Get columns error:%s", err.Error())
@@ -239,4 +259,37 @@ func injectList(list interface{}, ele interface{}, rows *sql.Rows) error {
 		listValue.Set(reflect.Append(listValue, *sv.value))
 	}
 	return nil
+}
+
+func (d *defaultHorm) Begin() error {
+	d.mutex.Lock()
+	var err error
+	tx, err := d.db.Begin()
+	if err != nil {
+		return errors.New("Begin transaction err:" + err.Error())
+	}
+	d.txMap[getGID()] = tx
+	return nil
+}
+
+func (d *defaultHorm) Commit() error {
+	defer d.mutex.Unlock()
+	return d.txMap[getGID()].Commit()
+}
+
+func (d *defaultHorm) RollBack() error {
+	defer d.mutex.Unlock()
+	return d.txMap[getGID()].Rollback()
+}
+
+func (d *defaultHorm) RegistMapping(i interface{}) error {
+	return errors.New("Not yet supported")
+}
+
+func (d *defaultHorm) getStatement(s string) (*sql.Stmt, error) {
+	if d.txMap[getGID()] == nil {
+		stmt, err := d.db.Prepare(s)
+		return stmt, err
+	}
+	return d.txMap[getGID()].Prepare(s)
 }

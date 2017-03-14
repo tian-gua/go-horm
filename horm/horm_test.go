@@ -40,10 +40,28 @@ func TestHorm(t *testing.T) {
 	dealError(err)
 	t.Logf("%+v", th2)
 
+	//更新struct
 	th2.Description = "更新 horm"
 	rows, err = horm.UpdateById(th2)
 	dealError(err)
 	t.Logf("更新了[%d]条记录", rows)
+
+	//自定义更新操作
+	result, err := horm.Exec("update tb_test set state = 1 where state = 9")
+	dealError(err)
+	rows, err = result.RowsAffected()
+	dealError(err)
+	t.Logf("更新了[%d]条记录", rows)
+
+	//自定义查询单个字段操作
+	tp := 0
+	err = horm.Query("select type from tb_test where id = 9", &tp)
+	dealError(err)
+	t.Logf("type=%d", tp)
+	des := ""
+	err = horm.Query("select description from tb_test where id = 9", &des)
+	dealError(err)
+	t.Logf("description=%s", des)
 
 	//查询id = 9的struct
 	th2 = &testHorm{Id: 9}
