@@ -19,6 +19,8 @@ func getGID() uint64 {
 }
 
 func logSql(s string) {
-	formatS := color.GreenString("%s", s)
-	log.Printf("[horm]:%s", formatS)
+	if printLog {
+		formatS := color.GreenString("%s", s)
+		log.Printf("[horm]:%s", formatS)
+	}
 }
