@@ -12,7 +12,7 @@ type tableStruct struct {
 
 func GenerateStruct(h IHorm, tableName string, structName string) (string, error) {
 	ts := new([]tableStruct)
-	err := h.Query("DESC " + tableName, ts)
+	err := h.Query("DESC "+tableName, ts)
 	if err != nil {
 		return "", fmt.Errorf("Generate table struct failed:%s", err.Error())
 	}
@@ -32,6 +32,8 @@ func getStructType(dbType string) string {
 		return "string"
 	} else if strings.Contains(dbType, "timestamp") || strings.Contains(dbType, "datetime") {
 		return "time.Time"
+	} else if strings.Contains(dbType, "decimal") || strings.Contains(dbType, "datetime") {
+		return "float64"
 	}
 	return "unknown"
 }

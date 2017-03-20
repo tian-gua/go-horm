@@ -2,6 +2,8 @@ package horm
 
 import (
 	"bytes"
+	"github.com/fatih/color"
+	"log"
 	"runtime"
 	"strconv"
 )
@@ -14,4 +16,9 @@ func getGID() uint64 {
 	b = b[:bytes.IndexByte(b, ' ')]
 	n, _ := strconv.ParseUint(string(b), 10, 64)
 	return n
+}
+
+func logSql(s string) {
+	formatS := color.GreenString("%s", s)
+	log.Printf("[horm]:%s", formatS)
 }

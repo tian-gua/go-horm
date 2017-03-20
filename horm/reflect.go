@@ -43,7 +43,7 @@ func getStuctInfo(i interface{}) (*StructInfo, error) {
 	}
 	/*end*/
 	/*从缓存中获反射信息*/
-	if v, ok := structInfoMap[kind.String()]; ok {
+	if v, ok := structInfoMap[t.Name()]; ok {
 		return v, nil
 	}
 	/*end*/
@@ -133,6 +133,8 @@ func convertString(v reflect.Value, k reflect.Kind) (string, error) {
 	switch k {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return strconv.Itoa(int(v.Int())), nil
+	case reflect.Float64:
+		return floatToString(v.Float()), nil
 	case reflect.String:
 		return "'" + v.String() + "'", nil
 	case reflect.Struct:
@@ -187,4 +189,8 @@ func setValue(v *reflect.Value, rb sql.RawBytes) error {
 		v.Set(reflect.ValueOf(t))
 	}
 	return nil
+}
+
+func floatToString(f float64) string {
+	return strconv.FormatFloat(f, 'f', 2, 64)
 }

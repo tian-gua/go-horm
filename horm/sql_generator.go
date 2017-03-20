@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/fatih/color"
 	"strings"
-	"time"
 )
 
 type ISqlGenerator interface {
@@ -52,7 +51,7 @@ func (d *defaultSqlGenerator) GenerateListSql(i interface{}, conditions ...strin
 		sort = "ORDER BY " + sort
 	}
 	s := fmt.Sprintf("SELECT %s FROM %s %s %s", fields, structInfo.tableName, where, sort)
-	color.Green("[horm]εε[%s]:\t%s", time.Now().Format("2006-01-02 15:04:05"), s)
+	logSql(s)
 	return s, nil
 }
 
@@ -71,7 +70,7 @@ func (d *defaultSqlGenerator) GenerateFindByIdSql(i interface{}) (string, error)
 	}
 	fields = strings.TrimSuffix(fields, ",")
 	s := fmt.Sprintf("SELECT %s FROM %s WHERE %s = %s", fields, structValue.tableName, structValue.pkColumnName, structValue.pkStringValue)
-	color.Green("[horm]εε[%s]:\t%s", time.Now().Format("2006-01-02 15:04:05"), s)
+	logSql(s)
 	return s, nil
 }
 
@@ -98,7 +97,7 @@ func (d *defaultSqlGenerator) GenerateSaveSql(i interface{}) (string, error) {
 		values += "," + v
 	}
 	s := fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s)", structValue.tableName, fileds, values)
-	color.Green("[horm]εε[%s]:\t%s", time.Now().Format("2006-01-02 15:04:05"), s)
+	logSql(s)
 	return s, nil
 }
 
@@ -119,7 +118,7 @@ func (d *defaultSqlGenerator) GenerateUpdateByIdSql(i interface{}) (string, erro
 	}
 	set = strings.TrimSuffix(set, ", ")
 	s := "UPDATE " + structValue.tableName + " SET " + set + " WHERE " + structValue.pkColumnName + " = " + structValue.pkStringValue
-	color.Green("[horm]εε[%s]:\t%s", time.Now().Format("2006-01-02 15:04:05"), s)
+	logSql(s)
 	return s, nil
 }
 
@@ -132,6 +131,6 @@ func (d *defaultSqlGenerator) GenerateDelByIdSql(i interface{}) (string, error) 
 		return "", fmt.Errorf("id can not be empty")
 	}
 	s := fmt.Sprintf("DELETE FROM %s WHERE %s = %s", structValue.tableName, structValue.pkColumnName, structValue.pkStringValue)
-	color.Green("[horm]εε[%s]:\t%s", time.Now().Format("2006-01-02 15:04:05"), s)
+	logSql(s)
 	return s, nil
 }

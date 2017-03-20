@@ -3,11 +3,11 @@ package horm
 import (
 	"database/sql"
 	"errors"
-	"github.com/fatih/color"
-	"strconv"
-	"time"
 	"fmt"
+	"log"
+	"strconv"
 	"sync"
+	"time"
 )
 
 type IHormManager interface {
@@ -22,7 +22,7 @@ type HormManager struct {
 }
 
 func (m *HormManager) Connect(url string, port int, userName string, passWord string, dbName string) (int64, error) {
-	db, err := sql.Open(MYSQL, userName + ":" + passWord + "@tcp(" + url + ":" + strconv.Itoa(port) + ")/" + dbName)
+	db, err := sql.Open(MYSQL, userName+":"+passWord+"@tcp("+url+":"+strconv.Itoa(port)+")/"+dbName)
 	if err != nil {
 		panic(errors.New("Not connected to the database:" + err.Error()))
 	}
@@ -41,7 +41,7 @@ func (m *HormManager) CloseAll() error {
 		if err != nil {
 			return errors.New("Connection closed failed:" + err.Error())
 		}
-		color.Green("[horm]εε[%s]:\tHorm-Connection[%d] is closed.\n", time.Now().Format("2006-01-02 15:04:05"), k)
+		log.Printf("[horm]:Horm-Connection[%d] is closed.\n", k)
 	}
 	return nil
 }
