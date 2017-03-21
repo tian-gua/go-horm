@@ -119,6 +119,7 @@ func (d *defaultHorm) Query(s string, i interface{}) error {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
+	logSql(s)
 	rows, stmt, err := d.query(s)
 	if err != nil {
 		return fmt.Errorf("Query select sql error:%s", err)
@@ -234,9 +235,12 @@ func injectOneStruct(i interface{}, rows *sql.Rows) error {
 			return err
 		}
 		for k, v := range values {
-			err = setValue(sv.fieldValueMap[columns[k]], v)
-			if err != nil {
-				return fmt.Errorf("Set value failed:%s", err)
+			f := sv.fieldValueMap[columns[k]]
+			if f != nil {
+				err = setValue(f, v)
+				if err != nil {
+					return fmt.Errorf("Set value failed:%s", err)
+				}
 			}
 		}
 	}
