@@ -158,33 +158,39 @@ func setValue(v *reflect.Value, rb sql.RawBytes) error {
 	case reflect.Int8:
 		intValue, err := strconv.Atoi(string(rb))
 		if err != nil {
-			return fmt.Errorf("Set [%s] value failed:%s", k.String(), err)
+			return err
 		}
 		v.Set(reflect.ValueOf(int8(intValue)))
 	case reflect.Int16:
 		intValue, err := strconv.Atoi(string(rb))
 		if err != nil {
-			return fmt.Errorf("Set [%s] value failed:%s", k.String(), err)
+			return err
 		}
 		v.Set(reflect.ValueOf(int16(intValue)))
 	case reflect.Int32:
 		intValue, err := strconv.Atoi(string(rb))
 		if err != nil {
-			return fmt.Errorf("Set [%s] value failed:%s", k.String(), err)
+			return err
 		}
 		v.Set(reflect.ValueOf(int32(intValue)))
 	case reflect.Int64:
 		intValue, err := strconv.Atoi(string(rb))
 		if err != nil {
-			return fmt.Errorf("Set [%s] value failed:%s", k.String(), err)
+			return err
 		}
 		v.Set(reflect.ValueOf(int64(intValue)))
+	case reflect.Float64:
+		floatValue, err := strconv.ParseFloat(string(rb), 64)
+		if err != nil {
+			return err
+		}
+		v.Set(reflect.ValueOf(floatValue))
 	case reflect.String:
 		v.Set(reflect.ValueOf(string(rb)))
 	case reflect.Struct:
 		t, err := time.Parse("2006-01-02 15:04:05", string(rb))
 		if err != nil {
-			return fmt.Errorf("Set [%s] value failed:%s", k.String(), err)
+			return err
 		}
 		v.Set(reflect.ValueOf(t))
 	}
