@@ -27,7 +27,7 @@ type defaultSqlGenerator struct {
 func (d *defaultSqlGenerator) GenerateListSql(i interface{}, conditions ...string) (string, error) {
 	structInfo, err := getStuctInfo(i)
 	if err != nil {
-		return "", fmt.Errorf("Get struct info error:%s", err.Error())
+		return "", fmt.Errorf("get struct reflect type failed -> %s", err.Error())
 	}
 	fields := structInfo.pkField.Tag.Get(COLUMN_TAG) + ","
 	for _, v := range structInfo.structFieldMap {
@@ -58,10 +58,10 @@ func (d *defaultSqlGenerator) GenerateListSql(i interface{}, conditions ...strin
 func (d *defaultSqlGenerator) GenerateFindByIdSql(i interface{}) (string, error) {
 	structValue, err := getStructValue(i)
 	if err != nil {
-		return "", fmt.Errorf("Get struct value error:%s", err.Error())
+		return "", fmt.Errorf("get struct reflect value failed -> %s", err.Error())
 	}
 	if structValue.pkColumnName == "" || structValue.pkStringValue == "" {
-		return "", fmt.Errorf("id can not be empty")
+		return "", fmt.Errorf("[%s] primary key [id] can not be empty", structValue.value.Type().Name())
 	}
 
 	fields := ""
@@ -77,7 +77,7 @@ func (d *defaultSqlGenerator) GenerateFindByIdSql(i interface{}) (string, error)
 func (d *defaultSqlGenerator) GenerateSaveSql(i interface{}) (string, error) {
 	structValue, err := getStructValue(i)
 	if err != nil {
-		return "", fmt.Errorf("Get struct value error:%s", err.Error())
+		return "", fmt.Errorf("get struct reflect value error -> %s", err.Error())
 	}
 	if structValue.pkColumnName == "" || structValue.pkStringValue == "" {
 		color.Red("there is no primary key")

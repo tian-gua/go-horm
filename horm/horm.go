@@ -6,17 +6,18 @@ import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"reflect"
+	"strings"
 	"sync"
 )
 
 type IHorm interface {
 	List(list interface{}, conditions ...string) error //查询列表
 	FindById(i interface{}) error                      //根据id查找
-	Save(i interface{}) (sql.Result, error)            //插入单个记录
-	UpdateById(i interface{}) (int64, error)           //根据id更新
-	DelById(i interface{}) (int64, error)              //根据id删除
+	Save(i interface{}) (*Result, error)               //插入单个记录
+	UpdateById(i interface{}) (*Result, error)         //根据id更新
+	DelById(i interface{}) (*Result, error)            //根据id删除
 	Query(string, interface{}) error                   //自定义sql
-	Exec(string) (sql.Result, error)                   //自定义sql
+	Exec(string) (*Result, error)                      //自定义sql
 	Begin() error                                      //开始事务
 	Commit() error                                     //提交事务
 	RollBack() error                                   //回滚
@@ -35,7 +36,7 @@ func (d *defaultHorm) List(list interface{}, conditions ...string) error {
 	if err != nil {
 		return fmt.Errorf("Get slice element failed")
 	}
-	sqlStr, err := sqlGenerator.GenerateListSql(ele)
+	sqlStr, err := sqlGenerator.GenerateListSql(ele, conditions...)
 	if err != nil {
 		return fmt.Errorf("Generate sql error:%s", err.Error())
 	}
@@ -82,7 +83,7 @@ func (d *defaultHorm) FindById(i interface{}) error {
 	return nil
 }
 
-func (d *defaultHorm) Save(i interface{}) (sql.Result, error) {
+func (d *defaultHorm) Save(i interface{}) (*Result, error) {
 	sqlStr, err := sqlGenerator.GenerateSaveSql(i)
 	if err != nil {
 		return nil, fmt.Errorf("generate sql failed:%s", err.Error())
@@ -90,28 +91,20 @@ func (d *defaultHorm) Save(i interface{}) (sql.Result, error) {
 	return d.exec(sqlStr)
 }
 
-func (d *defaultHorm) UpdateById(i interface{}) (int64, error) {
+func (d *defaultHorm) UpdateById(i interface{}) (*Result, error) {
 	sqlStr, err := sqlGenerator.GenerateUpdateByIdSql(i)
 	if err != nil {
-		return 0, errors.New("Generate sql failed:" + err.Error())
+		return nil, errors.New("Generate sql failed:" + err.Error())
 	}
-	res, err := d.exec(sqlStr)
-	if err != nil {
-		return 0, errors.New("Execute update operate failed:" + err.Error())
-	}
-	return res.RowsAffected()
+	return d.exec(sqlStr)
 }
 
-func (d *defaultHorm) DelById(i interface{}) (int64, error) {
+func (d *defaultHorm) DelById(i interface{}) (*Result, error) {
 	sqlStr, err := sqlGenerator.GenerateDelByIdSql(i)
 	if err != nil {
-		return 0, errors.New("Generate sql failed:" + err.Error())
+		return nil, errors.New("Generate sql failed:" + err.Error())
 	}
-	res, err := d.exec(sqlStr)
-	if err != nil {
-		return 0, errors.New("Execute delete operate failed:" + err.Error())
-	}
-	return res.RowsAffected()
+	return d.exec(sqlStr)
 }
 
 func (d *defaultHorm) Query(s string, i interface{}) error {
@@ -154,11 +147,11 @@ func (d *defaultHorm) Query(s string, i interface{}) error {
 	return nil
 }
 
-func (d *defaultHorm) Exec(s string) (sql.Result, error) {
+func (d *defaultHorm) Exec(s string) (*Result, error) {
 	return d.exec(s)
 }
 
-func (d *defaultHorm) exec(sqlStr string) (sql.Result, error) {
+func (d *defaultHorm) exec(sqlStr string) (*Result, error) {
 	stmt, err := d.getStatement(sqlStr)
 	if err != nil {
 		return nil, fmt.Errorf("Get statement error:%s", err.Error())
@@ -171,7 +164,21 @@ func (d *defaultHorm) exec(sqlStr string) (sql.Result, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Close statement error:%s", err.Error())
 	}
-	return result, nil
+	lastInsertId64, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	rowsAffected64, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	r := &Result{
+		LastInsertId:   int(lastInsertId64),
+		LastInsertId64: lastInsertId64,
+		RowsAffected:   int(rowsAffected64),
+		RowsAffected64: rowsAffected64,
+	}
+	return r, nil
 }
 
 func (d *defaultHorm) query(sqlStr string) (*sql.Rows, *sql.Stmt, error) {
@@ -331,6 +338,7 @@ func (d *defaultHorm) RegistMapping(i interface{}) error {
 }
 
 func (d *defaultHorm) getStatement(s string) (*sql.Stmt, error) {
+	s = strings.TrimSpace(s)
 	if d.txMap[getGID()] == nil {
 		stmt, err := d.db.Prepare(s)
 		return stmt, err

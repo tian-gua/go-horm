@@ -25,11 +25,9 @@ func TestHorm(t *testing.T) {
 	//保存新建的struct
 	res, err := horm.Save(th)
 	dealError(err)
-	lastId, err := res.LastInsertId()
-	dealError(err)
 
 	//删除新建的struct
-	th.Id = int(lastId)
+	th.Id = res.LastInsertId
 	rows, err := horm.DelById(th)
 	dealError(err)
 	t.Logf("rows=%d", rows)
@@ -49,9 +47,7 @@ func TestHorm(t *testing.T) {
 	//自定义更新操作
 	result, err := horm.Exec("update tb_test set state = 1 where state = 9")
 	dealError(err)
-	rows, err = result.RowsAffected()
-	dealError(err)
-	t.Logf("更新了[%d]条记录", rows)
+	t.Logf("更新了[%d]条记录", result.RowsAffected)
 
 	//自定义查询单条记录操作
 	single := &testHorm{}
