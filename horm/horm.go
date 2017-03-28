@@ -119,7 +119,7 @@ func (d *defaultHorm) Query(s string, i interface{}) error {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	logSql(s)
+	printLog(s)
 	rows, stmt, err := d.query(s)
 	if err != nil {
 		return fmt.Errorf("Query select sql error:%s", err)
@@ -303,6 +303,7 @@ func injectStructList(list interface{}, ele interface{}, rows *sql.Rows) error {
 }
 
 func (d *defaultHorm) Begin() error {
+	printLog("开启事务↓↓")
 	d.mutex.Lock()
 	var err error
 	tx, err := d.db.Begin()
@@ -314,11 +315,13 @@ func (d *defaultHorm) Begin() error {
 }
 
 func (d *defaultHorm) Commit() error {
+	printLog("提交事务↑↑")
 	defer d.mutex.Unlock()
 	return d.txMap[getGID()].Commit()
 }
 
 func (d *defaultHorm) RollBack() error {
+	printLog("回滚事务↑↑")
 	defer d.mutex.Unlock()
 	return d.txMap[getGID()].Rollback()
 }

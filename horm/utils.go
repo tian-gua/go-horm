@@ -18,8 +18,8 @@ func getGID() uint64 {
 	return n
 }
 
-func logSql(s string) {
-	if printLog {
+func printLog(s string) {
+	if isPrintLog {
 		formatS := color.GreenString("%s", s)
 		log.Printf("[horm]:%s", formatS)
 	}

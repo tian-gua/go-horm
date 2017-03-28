@@ -1,11 +1,11 @@
 package horm
 
-var printLog bool = false
+var isPrintLog bool = true
 
 func DisableLog() {
-	printLog = false
+	isPrintLog = false
 }
 
 func EnableLog() {
-	printLog = true
+	isPrintLog = true
 }
