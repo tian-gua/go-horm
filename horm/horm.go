@@ -132,9 +132,9 @@ func (d *defaultHorm) Query(s string, i interface{}) error {
 		} else {
 			err = injectOneFieldList(i, ele, rows)
 		}
-	}
-	if err != nil {
-		return fmt.Errorf("Inject one field failed:%s", err.Error())
+		if err != nil {
+			return fmt.Errorf("Inject one field failed:%s", err.Error())
+		}
 	}
 	err = rows.Close()
 	if err != nil {
@@ -258,10 +258,10 @@ func injectOneStruct(i interface{}, rows *sql.Rows) error {
 func injectOneFieldList(list interface{}, ele interface{}, rows *sql.Rows) error {
 	columns, err := rows.Columns()
 	if err != nil {
-		fmt.Errorf("Get columns error:%s", err.Error())
+		return fmt.Errorf("Get columns error:%s", err.Error())
 	}
 	if len(columns) != 1 {
-		fmt.Errorf("Result not a single column")
+		return fmt.Errorf("found [%d] columns but one", len(columns))
 	}
 	listValue := reflect.ValueOf(list).Elem()
 	for rows.Next() {
@@ -288,7 +288,7 @@ func injectStructList(list interface{}, ele interface{}, rows *sql.Rows) error {
 	listValue := reflect.ValueOf(list).Elem()
 	sv, err := getStructValue(ele)
 	if err != nil {
-		fmt.Errorf("Get element struct info failed")
+		return fmt.Errorf("get slice [%s] element struct reflect type failed -> %s", listValue.Type().Name(), err.Error())
 	}
 	for rows.Next() {
 		err = rows.Scan(scans...)
@@ -310,25 +310,25 @@ func injectStructList(list interface{}, ele interface{}, rows *sql.Rows) error {
 }
 
 func (d *defaultHorm) Begin() error {
-	printLog("开启事务↓↓")
+	printLog("transaction begin↓↓")
 	d.mutex.Lock()
 	var err error
 	tx, err := d.db.Begin()
 	if err != nil {
-		return errors.New("Begin transaction err:" + err.Error())
+		return errors.New("transaction error -> " + err.Error())
 	}
 	d.txMap[getGID()] = tx
 	return nil
 }
 
 func (d *defaultHorm) Commit() error {
-	printLog("提交事务↑↑")
+	printLog("transaction commit↑↑")
 	defer d.mutex.Unlock()
 	return d.txMap[getGID()].Commit()
 }
 
 func (d *defaultHorm) RollBack() error {
-	printLog("回滚事务↑↑")
+	printLog("transaction rollback↑↑")
 	defer d.mutex.Unlock()
 	return d.txMap[getGID()].Rollback()
 }
