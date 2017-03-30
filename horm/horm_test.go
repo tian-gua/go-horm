@@ -60,7 +60,7 @@ func TestHorm(t *testing.T) {
 	err = horm.Query("select * from tb_test", list)
 	dealError(err)
 	for _, v := range *list {
-		t.Logf("%+v", v)
+		t.Logf("---%+v", v)
 	}
 
 	//自定义查询单个字段操作
@@ -110,7 +110,7 @@ func dealError(err error) {
 }
 
 type testHorm struct {
-	Id          int       `field:"id" default:"auto"`
+	Id          int       `field:"id,pk,auto"`
 	CreateTime  time.Time `field:"create_time"`
 	ModifyTime  time.Time `field:"modify_time"`
 	State       int64     `field:"state"`

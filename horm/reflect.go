@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -14,6 +15,8 @@ type StructInfo struct {
 	structFieldMap map[string]*reflect.StructField //字段名->字段反射信息
 	columnFieldMap map[string]string               //列名->字段名
 	pkField        *reflect.StructField            //主键
+	pkColumnName   string                          //主键字段名
+	pkAutoIncrease bool                            //主键是否自增长
 }
 
 //结构体字段值
@@ -49,22 +52,28 @@ func getStuctInfo(i interface{}) (*StructInfo, error) {
 	}
 
 	var primarayKeyField *reflect.StructField = nil
+	pkColumnName := ""
+	auto := false
 	sfMap := make(map[string]*reflect.StructField)
 
 	/*遍历结构体字段,保存带有field标签的字段类型信息*/
 	for j := 0; j < t.NumField(); j++ {
 		sf := t.Field(j)
-		field := sf.Tag.Get(COLUMN_TAG)
-		if field != "" {
-			if field == "id" {
+		tags := strings.Split(strings.TrimSpace(sf.Tag.Get(COLUMN_TAG)), ",")
+		if tags[0] != "" {
+			if len(tags) >= 2 && tags[1] == "pk" {
 				primarayKeyField = &sf
+				pkColumnName = tags[0]
+				if len(tags) >= 3 && tags[2] == "auto" {
+					auto = true
+				}
 			} else {
 				sfMap[sf.Name] = &sf
 			}
 		}
 	}
 
-	si := &StructInfo{structFieldMap: sfMap, pkField: primarayKeyField}
+	si := &StructInfo{structFieldMap: sfMap, pkField: primarayKeyField, pkColumnName: pkColumnName, pkAutoIncrease: auto}
 
 	/*通过table接口调用GetTableName方法获取表名*/
 	if table, ok := i.(Table); ok {
@@ -91,35 +100,38 @@ func getStructValue(i interface{}) (*structValue, error) {
 	for fieldName, structField := range sf.structFieldMap {
 		value := v.FieldByName(fieldName)
 		if !value.CanSet() {
-			continue
+			return nil, fmt.Errorf("field [%s] is unexported", fieldName)
 		}
 		convertedValue, err := convertString(value, value.Kind())
 		if err != nil {
 			return nil, fmt.Errorf("convert [value=%s type=%s] error", value.Type(), value.Kind().String())
 		}
-		stringMap[structField.Tag.Get(COLUMN_TAG)] = convertedValue
-		valueMap[structField.Tag.Get(COLUMN_TAG)] = &value
+		tags := strings.Split(strings.TrimSpace(structField.Tag.Get(COLUMN_TAG)), ",")
+		stringMap[tags[0]] = convertedValue
+		valueMap[tags[0]] = &value
 	}
 
-	sv := &structValue{value: &v, fieldValueMap: valueMap, fieldStringMap: stringMap, tableName: sf.tableName}
+	sv := &structValue{
+		value:          &v,
+		fieldValueMap:  valueMap,
+		fieldStringMap: stringMap,
+		tableName:      sf.tableName,
+		autoIncrease:   sf.pkAutoIncrease,
+		pkColumnName:   sf.pkColumnName,
+	}
 
 	/*获取主键字段的值,校验主键字段是否可导出和是否是自增*/
 	if sf.pkField != nil {
-		sv.pkColumnName = sf.pkField.Tag.Get(COLUMN_TAG) //设置主键的列名
-		pkValue := v.FieldByName(sf.pkField.Name)        //获取主键的反射值
-		valueMap[sf.pkField.Tag.Get(COLUMN_TAG)] = &pkValue
+		pkValue := v.FieldByName(sf.pkField.Name) //获取主键的反射值
+		valueMap[sv.pkColumnName] = &pkValue
 		if !v.FieldByName(sf.pkField.Name).CanSet() {
-			return nil, fmt.Errorf("primary key is unexported")
+			return nil, fmt.Errorf("primary key [%s] is unexported", sf.pkField.Name)
 		}
 		pkStringValue, err := convertString(v.FieldByName(sf.pkField.Name), sf.pkField.Type.Kind())
 		if err != nil {
 			return nil, fmt.Errorf("convert id error:%s", err.Error())
 		}
 		sv.pkStringValue = pkStringValue
-		if "auto" == sf.pkField.Tag.Get("default") {
-			autoIncrease := true
-			sv.autoIncrease = autoIncrease
-		}
 	}
 
 	return sv, nil

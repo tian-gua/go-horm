@@ -34,7 +34,7 @@ type defaultHorm struct {
 func (d *defaultHorm) List(list interface{}, conditions ...string) error {
 	ele, err := getSliceElem(list)
 	if err != nil {
-		return fmt.Errorf("Get slice element failed")
+		return fmt.Errorf("get slice element failed -> %s", err.Error())
 	}
 	sqlStr, err := sqlGenerator.GenerateListSql(ele, conditions...)
 	if err != nil {
@@ -50,7 +50,7 @@ func (d *defaultHorm) List(list interface{}, conditions ...string) error {
 	}
 	err = rows.Close()
 	if err != nil {
-		return fmt.Errorf("Close rows failed")
+		return fmt.Errorf("close rows failed -> %s", err.Error())
 	}
 	err = stmt.Close()
 	if err != nil {
@@ -74,7 +74,7 @@ func (d *defaultHorm) FindById(i interface{}) error {
 	}
 	err = rows.Close()
 	if err != nil {
-		return fmt.Errorf("Close rows failed")
+		return fmt.Errorf("close rows failed -> %s", err.Error())
 	}
 	err = stmt.Close()
 	if err != nil {
@@ -125,7 +125,7 @@ func (d *defaultHorm) Query(s string, i interface{}) error {
 	case reflect.Slice:
 		ele, err := getSliceElem(i)
 		if err != nil {
-			return fmt.Errorf("Get slice element failed")
+			return fmt.Errorf("get slice element failed -> %s", err.Error())
 		}
 		if reflect.TypeOf(ele).Elem().Kind() == reflect.Struct {
 			err = injectStructList(i, ele, rows)
@@ -184,11 +184,11 @@ func (d *defaultHorm) exec(sqlStr string) (*Result, error) {
 func (d *defaultHorm) query(sqlStr string) (*sql.Rows, *sql.Stmt, error) {
 	stmt, err := d.getStatement(sqlStr)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Get statement error:%s", err.Error())
+		return nil, nil, fmt.Errorf("get statement error:%s", err.Error())
 	}
 	rows, err := stmt.Query()
 	if err != nil {
-		return nil, nil, fmt.Errorf("Execute sql error:%s", err.Error())
+		return nil, nil, fmt.Errorf("execute sql error:%s", err.Error())
 	}
 	return rows, stmt, nil
 }
@@ -197,16 +197,16 @@ func (d *defaultHorm) query(sqlStr string) (*sql.Rows, *sql.Stmt, error) {
 func injectOneField(i interface{}, rows *sql.Rows) error {
 	columns, err := rows.Columns()
 	if err != nil {
-		fmt.Errorf("Get columns error:%s", err.Error())
+		fmt.Errorf("get columns error:%s", err.Error())
 	}
 	if len(columns) != 1 {
-		fmt.Errorf("Result not a single column")
+		fmt.Errorf("found [%d] column but 1", len(columns))
 	}
 	rowNum := 0
 	for rows.Next() {
 		rowNum++
 		if rowNum > 1 {
-			return fmt.Errorf("Select one but found more")
+			return errors.New("select one but found more")
 		}
 		err = rows.Scan(i)
 		if err != nil {
@@ -220,7 +220,7 @@ func injectOneField(i interface{}, rows *sql.Rows) error {
 func injectOneStruct(i interface{}, rows *sql.Rows) error {
 	columns, err := rows.Columns()
 	if err != nil {
-		fmt.Errorf("Get columns error:%s", err.Error())
+		fmt.Errorf("get columns error:%s", err.Error())
 	}
 	values := make([]sql.RawBytes, len(columns))
 	scans := make([]interface{}, len(columns))
@@ -229,13 +229,13 @@ func injectOneStruct(i interface{}, rows *sql.Rows) error {
 	}
 	sv, err := getStructValue(i)
 	if err != nil {
-		return fmt.Errorf("Get struct value failed:%s", err.Error())
+		return fmt.Errorf("get struct value failed:%s", err.Error())
 	}
 	rowNum := 0
 	for rows.Next() {
 		rowNum++
 		if rowNum > 1 {
-			return fmt.Errorf("Select one but found more")
+			return errors.New("select one but found more")
 		}
 		err = rows.Scan(scans...)
 		if err != nil {
@@ -246,7 +246,7 @@ func injectOneStruct(i interface{}, rows *sql.Rows) error {
 			if f != nil {
 				err = setValue(f, v)
 				if err != nil {
-					return fmt.Errorf("Set value failed:%s", err)
+					return fmt.Errorf("set value failed -> %s", err)
 				}
 			}
 		}
@@ -258,7 +258,7 @@ func injectOneStruct(i interface{}, rows *sql.Rows) error {
 func injectOneFieldList(list interface{}, ele interface{}, rows *sql.Rows) error {
 	columns, err := rows.Columns()
 	if err != nil {
-		return fmt.Errorf("Get columns error:%s", err.Error())
+		return fmt.Errorf("get columns error:%s", err.Error())
 	}
 	if len(columns) != 1 {
 		return fmt.Errorf("found [%d] columns but one", len(columns))
@@ -278,7 +278,7 @@ func injectOneFieldList(list interface{}, ele interface{}, rows *sql.Rows) error
 func injectStructList(list interface{}, ele interface{}, rows *sql.Rows) error {
 	columns, err := rows.Columns()
 	if err != nil {
-		fmt.Errorf("Get columns error:%s", err.Error())
+		fmt.Errorf("get columns error:%s", err.Error())
 	}
 	values := make([]sql.RawBytes, len(columns))
 	scans := make([]interface{}, len(columns))
@@ -300,7 +300,7 @@ func injectStructList(list interface{}, ele interface{}, rows *sql.Rows) error {
 			if f != nil {
 				err = setValue(f, v)
 				if err != nil {
-					return fmt.Errorf("Set value failed:%s", err)
+					return fmt.Errorf("set value failed -> %s", err)
 				}
 			}
 		}

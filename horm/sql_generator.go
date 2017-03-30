@@ -2,8 +2,8 @@ package horm
 
 import (
 	"fmt"
-	"github.com/fatih/color"
 	"strings"
+	"errors"
 )
 
 type ISqlGenerator interface {
@@ -29,7 +29,7 @@ func (d *defaultSqlGenerator) GenerateListSql(i interface{}, conditions ...strin
 	if err != nil {
 		return "", fmt.Errorf("get struct reflect type failed -> %s", err.Error())
 	}
-	fields := structInfo.pkField.Tag.Get(COLUMN_TAG) + ","
+	fields := structInfo.pkColumnName + ","
 	for _, v := range structInfo.structFieldMap {
 		fields += v.Tag.Get(COLUMN_TAG) + ","
 	}
@@ -80,22 +80,26 @@ func (d *defaultSqlGenerator) GenerateSaveSql(i interface{}) (string, error) {
 		return "", fmt.Errorf("get struct reflect value error -> %s", err.Error())
 	}
 	if structValue.pkColumnName == "" || structValue.pkStringValue == "" {
-		color.Red("there is no primary key")
+		//color.Red("there is no primary key")
 	}
 	if len(structValue.fieldStringMap) == 0 {
-		return "", fmt.Errorf("there is no field need to insert or no exported field")
+		return "", errors.New("there is no field")
 	}
 	fileds := structValue.pkColumnName
 	values := ""
 	if structValue.autoIncrease {
 		values += "DEFAULT"
 	} else {
-		values += structValue.pkStringValue
+		if structValue.pkStringValue != "" {
+			values += structValue.pkStringValue
+		}
 	}
 	for k, v := range structValue.fieldStringMap {
 		fileds += "," + k
 		values += "," + v
 	}
+	fileds = strings.TrimPrefix(fileds, ",")
+	values = strings.TrimPrefix(values, ",")
 	s := fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s)", structValue.tableName, fileds, values)
 	printLog(s)
 	return s, nil
@@ -104,13 +108,13 @@ func (d *defaultSqlGenerator) GenerateSaveSql(i interface{}) (string, error) {
 func (d *defaultSqlGenerator) GenerateUpdateByIdSql(i interface{}) (string, error) {
 	structValue, err := getStructValue(i)
 	if err != nil {
-		return "", fmt.Errorf("Get struct value error:%s", err.Error())
+		return "", fmt.Errorf("get struct value error:%s", err.Error())
 	}
 	if structValue.pkColumnName == "" || structValue.pkStringValue == "" {
-		return "", fmt.Errorf("id can not be empty")
+		return "", errors.New("primary key can not be empty")
 	}
 	if len(structValue.fieldStringMap) == 0 {
-		return "", fmt.Errorf("there is no need to update or no exported field")
+		return "", errors.New("there is no field")
 	}
 	set := ""
 	for k, v := range structValue.fieldStringMap {
@@ -125,10 +129,10 @@ func (d *defaultSqlGenerator) GenerateUpdateByIdSql(i interface{}) (string, erro
 func (d *defaultSqlGenerator) GenerateDelByIdSql(i interface{}) (string, error) {
 	structValue, err := getStructValue(i)
 	if err != nil {
-		return "", fmt.Errorf("Get struct value error:%s", err.Error())
+		return "", fmt.Errorf("get struct value error -> %s", err.Error())
 	}
 	if structValue.pkColumnName == "" || structValue.pkStringValue == "" {
-		return "", fmt.Errorf("id can not be empty")
+		return "", errors.New("primary key can not be empty")
 	}
 	s := fmt.Sprintf("DELETE FROM %s WHERE %s = %s", structValue.tableName, structValue.pkColumnName, structValue.pkStringValue)
 	printLog(s)
